@@ -14,7 +14,6 @@ using Content.Shared.CCVar;
 using Content.Shared.Chat;
 using Content.Shared.Database;
 using Content.Shared.Ghost;
-using Content.Shared.Humanoid;
 using Content.Shared.IdentityManagement;
 using Content.Shared.Interaction;
 using Content.Shared.Mobs.Systems;
@@ -303,67 +302,65 @@ public sealed partial class ChatSystem : SharedChatSystem
     #region Announcements
 
     /// <summary>
-    /// Dispatches an announcement to all.
+    /// Dispatches an announcement.
     /// </summary>
-    /// <param name="message">The contents of the message</param>
-    /// <param name="sender">The sender (Communications Console in Communications Console Announcement)</param>
-    /// <param name="playSound">Play the announcement sound</param>
-    /// <param name="colorOverride">Optional color for the announcement message</param>
-    public void DispatchGlobalAnnouncement(
-        string message,
+    /// <param name="message">Само оповещение</param>
+    /// <param name="sender">Отправитель, оповещения</param>
+    /// <param name="colorOverride">Опциональный цвет для оповещений. По умолчанию: Color.Gold</param>
+    /// <param name="uid">Объект/Станция на которой будет происходить оповещение. Если не указано, по умолчанию оповещение проигрывается для всех</param>
+    /// <param name="global">Boolean, Проигрывать ли оповещение для всех на сервере</param>
+    /// <param name="sound">SoundSpecifier, необходим, для поиска пути до музыки и установления Params</param>
+    /// <param name="playSound">Boolean, проигрывать или не проигрывать звук при оповещении</param>
+    public void DispatchAnnouncement(string message,
         string sender = "Central Command",
-        bool playSound = true,
-        SoundSpecifier? announcementSound = null,
-        Color? colorOverride = null
-        )
+        Color? colorOverride = null,
+        EntityUid uid = default,
+        SoundSpecifier? sound = null,
+        bool global = false,
+        bool playSound = true)
     {
-        var wrappedMessage = Loc.GetString("chat-manager-sender-announcement-wrap-message", ("sender", sender), ("message", FormattedMessage.EscapeText(message)));
-        _chatManager.ChatMessageToAll(ChatChannel.Radio, message, wrappedMessage, default, false, true, colorOverride);
-        if (playSound)
+        if (uid == default)
+            global = true;
+
+        var wrappedMessage = Loc.GetString("chat-manager-sender-announcement-wrap-message", ("sender", sender),
+        ("message", FormattedMessage.EscapeText(message)));
+
+        if (uid != default)
         {
-            if (sender == Loc.GetString("admin-announce-announcer-default")) announcementSound = new SoundPathSpecifier(CentComAnnouncementSound); // Corvax-Announcements: Support custom alert sound from admin panel
-            _audio.PlayGlobal(announcementSound?.GetSound() ?? DefaultAnnouncementSound, Filter.Broadcast(), true, announcementSound?.Params ?? AudioParams.Default.WithVolume(-2f));
+            var station = _stationSystem.GetOwningStation(uid);
+
+            if (station is not null && global is false)
+            {
+                if (!EntityManager.TryGetComponent<StationDataComponent>(station, out var stationDataComp))
+                    return;
+
+                _chatManager.ChatMessageToManyFiltered(_stationSystem.GetInStation(stationDataComp), ChatChannel.Radio, message, wrappedMessage, uid, false, true, colorOverride ?? Color.Gold);
+                _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Station announcement from {sender}: {message}");
+
+                if (playSound == true && sound == null)
+                    _audio.PlayGlobal(DefaultAnnouncementSound,
+                    _stationSystem.GetInStation(stationDataComp),
+                    true, AudioParams.Default.WithVolume(-2f));
+
+                if (playSound == true && sound != null)
+                    _audio.PlayGlobal(_audio.GetSound(sound),
+                    _stationSystem.GetInStation(stationDataComp),
+                    true, sound.Params.AddVolume(-2f));
+            }
         }
-        _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Global station announcement from {sender}: {message}");
-    }
-
-    /// <summary>
-    /// Dispatches an announcement on a specific station
-    /// </summary>
-    /// <param name="source">The entity making the announcement (used to determine the station)</param>
-    /// <param name="message">The contents of the message</param>
-    /// <param name="sender">The sender (Communications Console in Communications Console Announcement)</param>
-    /// <param name="playDefaultSound">Play the announcement sound</param>
-    /// <param name="colorOverride">Optional color for the announcement message</param>
-    public void DispatchStationAnnouncement(
-        EntityUid source,
-        string message,
-        string sender = "Central Command",
-        bool playDefaultSound = true,
-        SoundSpecifier? announcementSound = null,
-        Color? colorOverride = null)
-    {
-        var wrappedMessage = Loc.GetString("chat-manager-sender-announcement-wrap-message", ("sender", sender), ("message", FormattedMessage.EscapeText(message)));
-        var station = _stationSystem.GetOwningStation(source);
-
-        if (station == null)
+        if (global is true)
         {
-            // you can't make a station announcement without a station
-            return;
+            _chatManager.ChatMessageToAll(ChatChannel.Radio, message, wrappedMessage, default, false, true, colorOverride ?? Color.Gold);
+            _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Global announcement from {sender}: {message}");
+
+            if (playSound == true && sound == null)
+                _audio.PlayGlobal(DefaultAnnouncementSound,
+                Filter.Broadcast(), true, AudioParams.Default.WithVolume(-2f));
+
+            if (playSound == true && sound != null)
+                _audio.PlayGlobal(_audio.GetSound(sound),
+                Filter.Broadcast(), true, sound.Params.AddVolume(-2f));
         }
-
-        if (!EntityManager.TryGetComponent<StationDataComponent>(station, out var stationDataComp)) return;
-
-        var filter = _stationSystem.GetInStation(stationDataComp);
-
-        _chatManager.ChatMessageToManyFiltered(filter, ChatChannel.Radio, message, wrappedMessage, source, false, true, colorOverride);
-
-        if (playDefaultSound)
-        {
-            _audio.PlayGlobal(announcementSound?.GetSound() ?? DefaultAnnouncementSound, filter, true, AudioParams.Default.WithVolume(-2f));
-        }
-
-        _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Station Announcement on {station} from {sender}: {message}");
     }
 
     #endregion

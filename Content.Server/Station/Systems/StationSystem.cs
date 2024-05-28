@@ -402,7 +402,9 @@ public sealed class StationSystem : EntitySystem
 
         if (loud)
         {
-            _chatSystem.DispatchStationAnnouncement(station, $"The station {oldName} has been renamed to {name}.");
+            var message = $"The station {oldName} has been renamed to {name}.";
+
+            _chatSystem.DispatchAnnouncement(message, global: true);
         }
 
         RaiseLocalEvent(station, new StationRenamedEvent(oldName, name), true);

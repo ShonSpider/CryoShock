@@ -1,5 +1,4 @@
 ﻿using Content.Server.GameTicking.Components;
-using Content.Server.GameTicking.Rules.Components;
 using Content.Server.Power.Components;
 using Content.Server.Power.EntitySystems;
 using Content.Server.Station.Components;
@@ -18,7 +17,7 @@ public sealed class BreakerFlipRule : StationEventSystem<BreakerFlipRuleComponen
         base.Added(uid, component, gameRule, args);
 
         var str = Loc.GetString("station-event-breaker-flip-announcement", ("data", Loc.GetString(Loc.GetString($"random-sentience-event-data-{RobustRandom.Next(1, 6)}"))));
-        ChatSystem.DispatchGlobalAnnouncement(str, playSound: false, colorOverride: Color.Gold);
+        ChatSystem.DispatchAnnouncement(str);
     }
 
     protected override void Started(EntityUid uid, BreakerFlipRuleComponent component, GameRuleComponent gameRule, GameRuleStartedEvent args)

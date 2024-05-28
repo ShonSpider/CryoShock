@@ -1,5 +1,3 @@
-using Content.Server.Chat;
-
 namespace Content.Server.Chat.Systems;
 
 public sealed class AnnounceOnSpawnSystem : EntitySystem
@@ -17,6 +15,6 @@ public sealed class AnnounceOnSpawnSystem : EntitySystem
     {
         var message = Loc.GetString(comp.Message);
         var sender = comp.Sender != null ? Loc.GetString(comp.Sender) : "Central Command";
-        _chat.DispatchGlobalAnnouncement(message, sender, playSound: true, comp.Sound, comp.Color);
+        _chat.DispatchAnnouncement(message, sender, comp.Color ?? Color.Green, sound: comp.Sound);
     }
 }

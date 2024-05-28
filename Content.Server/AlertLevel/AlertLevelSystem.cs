@@ -2,7 +2,6 @@ using System.Linq;
 using Content.Server.Chat.Systems;
 using Content.Server.Station.Systems;
 using Content.Shared.CCVar;
-using Robust.Shared.Audio;
 using Robust.Shared.Audio.Systems;
 using Robust.Shared.Configuration;
 using Robust.Shared.Prototypes;
@@ -176,20 +175,14 @@ public sealed class AlertLevelSystem : EntitySystem
         if (playSound)
         {
             if (detail.Sound != null)
-            {
-                var filter = _stationSystem.GetInOwningStation(station);
-                _audio.PlayGlobal(detail.Sound, filter, true, detail.Sound.Params);
-            }
-            else
-            {
-                playDefault = true;
-            }
+                _audio.PlayGlobal(detail.Sound, _stationSystem.GetInOwningStation(station), true, detail.Sound.Params);
         }
+        else
+            playDefault = true;
 
         if (announce)
         {
-            _chatSystem.DispatchStationAnnouncement(station, announcementFull, playDefaultSound: playDefault,
-                colorOverride: detail.Color, sender: stationName);
+            _chatSystem.DispatchAnnouncement(announcementFull, stationName, detail.Color, station, playSound: playDefault);
         }
 
         RaiseLocalEvent(new AlertLevelChangedEvent(station, level));

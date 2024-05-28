@@ -4,7 +4,6 @@ using Content.Server.AlertLevel;
 using Content.Shared.CCVar;
 using Content.Server.Chat.Managers;
 using Content.Server.Chat.Systems;
-using Content.Server.DeviceNetwork;
 using Content.Server.DeviceNetwork.Components;
 using Content.Server.DeviceNetwork.Systems;
 using Content.Server.GameTicking;
@@ -181,16 +180,10 @@ namespace Content.Server.RoundEnd
                 units = "eta-units-minutes";
             }
 
-            _chatSystem.DispatchGlobalAnnouncement(Loc.GetString(text,
-                ("time", time),
-                ("units", Loc.GetString(units))),
-                name,
-                false,
-                null,
-                Color.Gold);
-
-            if (!_autoCalledBefore) _audio.PlayGlobal("/Audio/Announcements/shuttlecalled.ogg", Filter.Broadcast(), true, AudioParams.Default.AddVolume(-4)); // Corvax-Announcements: Custom sound for auto-called
-            else _audio.PlayGlobal("/Audio/Corvax/Announcements/crew_s_called.ogg", Filter.Broadcast(), true, AudioParams.Default.AddVolume(-4)); // Corvax-Announcements
+            if (_autoCalledBefore)
+                _chatSystem.DispatchAnnouncement(Loc.GetString(text, ("time", time), ("units", Loc.GetString(units))), name, sound: new SoundPathSpecifier("/Audio/Announcements/shuttlecalled.ogg", AudioParams.Default.AddVolume(-4)));
+            else
+                _chatSystem.DispatchAnnouncement(Loc.GetString(text, ("time", time), ("units", Loc.GetString(units))), name, sound: new SoundPathSpecifier("/Audio/Corvax/Announcements/crew_s_called.ogg", AudioParams.Default.AddVolume(-4)));
 
             LastCountdownStart = _gameTiming.CurTime;
             ExpectedCountdownEnd = _gameTiming.CurTime + countdownTime;
@@ -235,10 +228,9 @@ namespace Content.Server.RoundEnd
                 _adminLogger.Add(LogType.ShuttleRecalled, LogImpact.High, $"Shuttle recalled");
             }
 
-            _chatSystem.DispatchGlobalAnnouncement(Loc.GetString("round-end-system-shuttle-recalled-announcement"),
-                Loc.GetString("Station"), false, colorOverride: Color.Gold);
-
-            _audio.PlayGlobal("/Audio/Announcements/shuttlerecalled.ogg", Filter.Broadcast(), true, AudioParams.Default.AddVolume(-4)); // Corvax-Announcements: Decrease volume
+            _chatSystem.DispatchAnnouncement(Loc.GetString("round-end-system-shuttle-recalled-announcement"),
+                Loc.GetString("Station"),
+                sound: new SoundPathSpecifier("/Audio/Announcements/shuttlerecalled.ogg", AudioParams.Default.AddVolume(-4)));
 
             LastCountdownStart = null;
             ExpectedCountdownEnd = null;
@@ -317,9 +309,7 @@ namespace Content.Server.RoundEnd
                     // Check is shuttle called or not. We should only dispatch announcement if it's already called
                     if (IsRoundEndRequested())
                     {
-                        _chatSystem.DispatchGlobalAnnouncement(Loc.GetString(textAnnounce),
-                            Loc.GetString(sender),
-                            colorOverride: Color.Gold);
+                        _chatSystem.DispatchAnnouncement(Loc.GetString(textAnnounce), Loc.GetString(sender));
                     }
                     else
                     {

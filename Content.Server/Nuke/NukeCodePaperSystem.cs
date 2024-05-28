@@ -23,7 +23,7 @@ namespace Content.Server.Nuke
         {
             base.Initialize();
             SubscribeLocalEvent<NukeCodePaperComponent, MapInitEvent>(OnMapInit,
-                after: new []{ typeof(NukeLabelSystem) });
+                after: [typeof(NukeLabelSystem)]);
         }
 
         private void OnMapInit(EntityUid uid, NukeCodePaperComponent component, MapInitEvent args)
@@ -80,8 +80,8 @@ namespace Content.Server.Nuke
 
             if (wasSent)
             {
-                var msg = Loc.GetString("nuke-component-announcement-send-codes");
-                _chatSystem.DispatchStationAnnouncement(station, msg, colorOverride: Color.Red);
+                var message = Loc.GetString("nuke-component-announcement-send-codes");
+                _chatSystem.DispatchAnnouncement(message, colorOverride: Color.Red, uid: station);
             }
 
             return wasSent;
@@ -129,7 +129,7 @@ namespace Content.Server.Nuke
             }
 
             if (!codesMessage.IsEmpty)
-                nukeCode = Loc.GetString("nuke-codes-message")+codesMessage;
+                nukeCode = Loc.GetString("nuke-codes-message") + codesMessage;
             return !codesMessage.IsEmpty;
         }
     }

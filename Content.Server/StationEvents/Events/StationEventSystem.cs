@@ -1,9 +1,7 @@
-using System.Linq;
 using Content.Server.Administration.Logs;
 using Content.Server.Chat.Systems;
 using Content.Server.GameTicking.Components;
 using Content.Server.GameTicking.Rules;
-using Content.Server.GameTicking.Rules.Components;
 using Content.Server.Station.Systems;
 using Content.Server.StationEvents.Components;
 using Content.Shared.Database;
@@ -48,7 +46,8 @@ public abstract class StationEventSystem<T> : GameRuleSystem<T> where T : ICompo
 
         if (stationEvent.StartAnnouncement != null)
         {
-            ChatSystem.DispatchGlobalAnnouncement(Loc.GetString(stationEvent.StartAnnouncement), playSound: false, colorOverride: Color.Gold);
+            var message = Loc.GetString(stationEvent.StartAnnouncement);
+            ChatSystem.DispatchAnnouncement(message, "Central Command", Color.Gold, uid);
         }
 
         Audio.PlayGlobal(stationEvent.StartAudio, Filter.Broadcast(), true);
@@ -87,10 +86,9 @@ public abstract class StationEventSystem<T> : GameRuleSystem<T> where T : ICompo
 
         if (stationEvent.EndAnnouncement != null)
         {
-            ChatSystem.DispatchGlobalAnnouncement(Loc.GetString(stationEvent.EndAnnouncement), playSound: false, colorOverride: Color.Gold);
+            var message = Loc.GetString(stationEvent.EndAnnouncement);
+            ChatSystem.DispatchAnnouncement(message, sound: stationEvent.EndAudio);
         }
-
-        Audio.PlayGlobal(stationEvent.EndAudio, Filter.Broadcast(), true);
     }
 
     /// <summary>

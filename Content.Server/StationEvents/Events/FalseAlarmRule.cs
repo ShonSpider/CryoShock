@@ -1,9 +1,7 @@
 ﻿using System.Linq;
 using Content.Server.GameTicking.Components;
-using Content.Server.GameTicking.Rules.Components;
 using Content.Server.StationEvents.Components;
 using JetBrains.Annotations;
-using Robust.Shared.Player;
 using Robust.Shared.Random;
 
 namespace Content.Server.StationEvents.Events;
@@ -22,8 +20,7 @@ public sealed class FalseAlarmRule : StationEventSystem<FalseAlarmRuleComponent>
 
         if (picked.StartAnnouncement != null)
         {
-            ChatSystem.DispatchGlobalAnnouncement(Loc.GetString(picked.StartAnnouncement), playSound: false, colorOverride: Color.Gold);
+            ChatSystem.DispatchAnnouncement(Loc.GetString(picked.StartAnnouncement), sound: picked.StartAudio);
         }
-        Audio.PlayGlobal(picked.StartAudio, Filter.Broadcast(), true);
     }
 }

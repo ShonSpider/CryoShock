@@ -463,9 +463,8 @@ public sealed class NukeSystem : EntitySystem
             ("time", (int) component.RemainingTime),
             ("location", FormattedMessage.RemoveMarkup(_navMap.GetNearestBeaconString((uid, nukeXform)))));
         var sender = Loc.GetString("nuke-component-announcement-sender");
-        _chatSystem.DispatchStationAnnouncement(stationUid ?? uid, announcement, sender, false, null, Color.Red);
+        _chatSystem.DispatchAnnouncement(announcement, sender, Color.Red, stationUid ?? uid, component.ArmSound);
 
-        _sound.PlayGlobalOnStation(uid, _audio.GetSound(component.ArmSound));
         _nukeSongLength = (float) _audio.GetAudioLength(_selectedNukeSong).TotalSeconds;
 
         // turn on the spinny light
@@ -503,10 +502,9 @@ public sealed class NukeSystem : EntitySystem
         // warn a crew
         var announcement = Loc.GetString("nuke-component-announcement-unarmed");
         var sender = Loc.GetString("nuke-component-announcement-sender");
-        _chatSystem.DispatchStationAnnouncement(uid, announcement, sender, false);
+        _chatSystem.DispatchAnnouncement(announcement, sender, uid: uid, sound: component.DisarmSound);
 
         component.PlayedNukeSong = false;
-        _sound.PlayGlobalOnStation(uid, _audio.GetSound(component.DisarmSound));
         _sound.StopStationEventMusic(uid, StationEventMusicType.Nuke);
 
         // disable sound and reset it

@@ -4,7 +4,6 @@ using Content.Server.StationRecords.Systems;
 using Content.Shared.CriminalRecords;
 using Content.Shared.CriminalRecords.Components;
 using Content.Shared.CriminalRecords.Systems;
-using Content.Shared.Dataset;
 using Content.Shared.Security;
 using Content.Shared.StationRecords;
 using Robust.Shared.Prototypes;
@@ -33,10 +32,10 @@ public sealed class CriminalRecordsHackerSystem : SharedCriminalRecordsHackerSys
         if (args.Cancelled || args.Handled || args.Target == null)
             return;
 
-        if (_station.GetOwningStation(ent) is not {} station)
+        if (_station.GetOwningStation(ent) is not { } station)
             return;
 
-        var reasons = _proto.Index<DatasetPrototype>(ent.Comp.Reasons);
+        var reasons = _proto.Index(ent.Comp.Reasons);
         foreach (var (key, record) in _records.GetRecordsOfType<CriminalRecord>(station))
         {
             var reason = _random.Pick(reasons.Values);
@@ -46,7 +45,8 @@ public sealed class CriminalRecordsHackerSystem : SharedCriminalRecordsHackerSys
             // main damage with this is existing arrest warrants are lost and to anger beepsky
         }
 
-        _chat.DispatchGlobalAnnouncement(Loc.GetString(ent.Comp.Announcement), playSound: true, colorOverride: Color.Red);
+        var message = Loc.GetString(ent.Comp.Announcement);
+        _chat.DispatchAnnouncement(message, colorOverride: Color.Red, uid: station);
 
         // once is enough
         RemComp<CriminalRecordsHackerComponent>(ent);

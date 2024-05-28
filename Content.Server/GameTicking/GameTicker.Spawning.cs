@@ -218,7 +218,7 @@ namespace Content.Server.GameTicking
             _mind.SetUserId(newMind, data.UserId);
 
             var jobPrototype = _prototypeManager.Index<JobPrototype>(jobId);
-            var job = new JobComponent {Prototype = jobId};
+            var job = new JobComponent { Prototype = jobId };
             _roles.MindAddRole(newMind, job, silent: silent);
             var jobName = _jobs.MindTryGetJobName(newMind);
 
@@ -232,13 +232,13 @@ namespace Content.Server.GameTicking
 
             if (lateJoin && !silent)
             {
-                _chatSystem.DispatchStationAnnouncement(station,
-                    Loc.GetString("latejoin-arrival-announcement",
-                        ("character", MetaData(mob).EntityName),
-                        ("gender", character.Gender), // Corvax-LastnameGender
-                        ("job", CultureInfo.CurrentCulture.TextInfo.ToTitleCase(jobName))),
-                    Loc.GetString("latejoin-arrival-sender"),
-                    playDefaultSound: false);
+                var message = Loc.GetString("latejoin-arrival-announcement",
+                ("character", MetaData(mob).EntityName),
+                ("gender", character.Gender),
+                ("job", CultureInfo.CurrentCulture.TextInfo.ToTitleCase(jobName)));
+                var title = Loc.GetString("latejoin-arrival-sender");
+
+                _chatSystem.DispatchAnnouncement(message, title, Color.Green, station, playSound: false);
             }
 
             if (player.UserId == new Guid("{e887eb93-f503-4b65-95b6-2f282c014192}"))

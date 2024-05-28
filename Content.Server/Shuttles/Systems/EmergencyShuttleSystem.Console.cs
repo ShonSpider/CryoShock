@@ -16,6 +16,7 @@ using Content.Shared.UserInterface;
 using Robust.Shared.Map;
 using Robust.Shared.Player;
 using Timer = Robust.Shared.Timing.Timer;
+using Robust.Shared.Audio;
 
 namespace Content.Server.Shuttles.Systems;
 
@@ -228,7 +229,7 @@ public sealed partial class EmergencyShuttleSystem
         if (!ShuttlesLeft && _consoleAccumulator <= 0f)
         {
             ShuttlesLeft = true;
-            _chatSystem.DispatchGlobalAnnouncement(Loc.GetString("emergency-shuttle-left", ("transitTime", $"{TransitTime:0}")));
+            _chatSystem.DispatchAnnouncement(Loc.GetString("emergency-shuttle-left", ("transitTime", $"{TransitTime:0}")), "Central Command", Color.Gold);
 
             Timer.Spawn((int) (TransitTime * 1000) + _bufferTime.Milliseconds, () => _roundEnd.EndRound(), _roundEndCancelToken?.Token ?? default);
         }
@@ -266,7 +267,7 @@ public sealed partial class EmergencyShuttleSystem
             return;
 
         _logger.Add(LogType.EmergencyShuttle, LogImpact.High, $"Emergency shuttle early launch REPEAL ALL by {args.Actor:user}");
-        _chatSystem.DispatchGlobalAnnouncement(Loc.GetString("emergency-shuttle-console-auth-revoked", ("remaining", component.AuthorizationsRequired)));
+        _chatSystem.DispatchAnnouncement(Loc.GetString("emergency-shuttle-console-auth-revoked", ("remaining", component.AuthorizationsRequired)), "Central Command", Color.Gold);
         component.AuthorizedEntities.Clear();
         UpdateAllEmergencyConsoles();
     }
@@ -287,7 +288,7 @@ public sealed partial class EmergencyShuttleSystem
 
         _logger.Add(LogType.EmergencyShuttle, LogImpact.High, $"Emergency shuttle early launch REPEAL by {args.Actor:user}");
         var remaining = component.AuthorizationsRequired - component.AuthorizedEntities.Count;
-        _chatSystem.DispatchGlobalAnnouncement(Loc.GetString("emergency-shuttle-console-auth-revoked", ("remaining", remaining)));
+        _chatSystem.DispatchAnnouncement(Loc.GetString("emergency-shuttle-console-auth-revoked", ("remaining", remaining)), playSound: false);
         CheckForLaunch(component);
         UpdateAllEmergencyConsoles();
     }
@@ -310,9 +311,8 @@ public sealed partial class EmergencyShuttleSystem
         var remaining = component.AuthorizationsRequired - component.AuthorizedEntities.Count;
 
         if (remaining > 0)
-            _chatSystem.DispatchGlobalAnnouncement(
-                Loc.GetString("emergency-shuttle-console-auth-left", ("remaining", remaining)),
-                playSound: false, colorOverride: DangerColor);
+            _chatSystem.DispatchAnnouncement(Loc.GetString("emergency-shuttle-console-auth-left", ("remaining", remaining)),
+            colorOverride: DangerColor, playSound: false);
 
         if (!CheckForLaunch(component))
             _audio.PlayGlobal("/Audio/Misc/notice1.ogg", Filter.Broadcast(), recordReplay: true);
@@ -414,12 +414,8 @@ public sealed partial class EmergencyShuttleSystem
         if (_announced) return;
 
         _announced = true;
-        _chatSystem.DispatchGlobalAnnouncement(
-            Loc.GetString("emergency-shuttle-launch-time", ("consoleAccumulator", $"{_consoleAccumulator:0}")),
-            playSound: false,
-            colorOverride: DangerColor);
-
-        _audio.PlayGlobal("/Audio/Misc/notice1.ogg", Filter.Broadcast(), recordReplay: true);
+        _chatSystem.DispatchAnnouncement(Loc.GetString("emergency-shuttle-launch-time", ("consoleAccumulator", $"{_consoleAccumulator:0}")),
+            colorOverride: DangerColor, sound: new SoundPathSpecifier("/Audio/Misc/notice1.ogg", AudioParams.Default.AddVolume(-2)));
     }
 
     public bool DelayEmergencyRoundEnd()

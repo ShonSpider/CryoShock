@@ -30,7 +30,6 @@ public sealed class ZombieRuleSystem : GameRuleSystem<ZombieRuleComponent>
     [Dependency] private readonly StationSystem _station = default!;
     [Dependency] private readonly AntagSelectionSystem _antag = default!;
     [Dependency] private readonly IGameTiming _timing = default!;
-
     public override void Initialize()
     {
         base.Initialize();
@@ -101,7 +100,10 @@ public sealed class ZombieRuleSystem : GameRuleSystem<ZombieRuleComponent>
         {
             foreach (var station in _station.GetStations())
             {
-                _chat.DispatchStationAnnouncement(station, Loc.GetString("zombie-shuttle-call"), colorOverride: Color.Crimson);
+                var message = Loc.GetString("zombie-shuttle-call");
+                var title = Loc.GetString("zombie-title-call");
+
+                _chat.DispatchAnnouncement(message, title, Color.Crimson, station);
             }
             _roundEnd.RequestRoundEnd(null, false);
         }

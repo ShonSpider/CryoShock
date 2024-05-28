@@ -5,7 +5,6 @@ using Robust.Shared.Utility;
 using Content.Server.Chat.Systems;
 using Content.Server.Station.Systems;
 using Robust.Shared.Timing;
-using Robust.Shared.Audio;
 using Robust.Shared.Audio.Systems;
 using Content.Server.Power.EntitySystems;
 
@@ -121,17 +120,9 @@ namespace Content.Server.PowerSink
                 return;
 
             powerSinkComponent.SentImminentExplosionWarningMessage = true;
-            var station = _station.GetOwningStation(uid);
 
-            if (station == null)
-                return;
-
-            _chat.DispatchStationAnnouncement(
-                station.Value,
-                Loc.GetString("powersink-immiment-explosion-announcement"),
-                playDefaultSound: true,
-                colorOverride: Color.Yellow
-            );
+            var message = Loc.GetString("powersink-immiment-explosion-announcement");
+            _chat.DispatchAnnouncement(message, colorOverride: Color.Yellow, uid: uid);
         }
     }
 }

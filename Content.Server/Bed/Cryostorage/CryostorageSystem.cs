@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Linq;
 using Content.Server.Chat.Managers;
 using Content.Server.GameTicking;
 using Content.Server.Hands.Systems;
@@ -235,14 +234,11 @@ public sealed class CryostorageSystem : SharedCryostorageSystem
             _stationRecords.RemoveRecord(key, stationRecords);
         }
 
-        _chatSystem.DispatchStationAnnouncement(station.Value,
-            Loc.GetString(
-                "earlyleave-cryo-announcement",
-                ("character", name),
-                ("job", CultureInfo.CurrentCulture.TextInfo.ToTitleCase(jobName))
-            ), Loc.GetString("earlyleave-cryo-sender"),
-            playDefaultSound: false
-        );
+        var message = Loc.GetString("earlyleave-cryo-announcement", ("character", name),
+        ("job", CultureInfo.CurrentCulture.TextInfo.ToTitleCase(jobName)));
+        var title = Loc.GetString("earlyleave-cryo-sender");
+
+        _chatSystem.DispatchAnnouncement(message, title, Color.Green, station.Value, playSound: false);
     }
 
     private void HandleCryostorageReconnection(Entity<CryostorageContainedComponent> entity)

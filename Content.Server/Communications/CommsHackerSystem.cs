@@ -8,7 +8,6 @@ using Content.Shared.Random;
 using Content.Shared.Random.Helpers;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
-using Robust.Shared.Serialization;
 
 namespace Content.Server.Communications;
 
@@ -79,7 +78,8 @@ public sealed class CommsHackerSystem : SharedCommsHackerSystem
     public void CallInThreat(NinjaHackingThreatPrototype ninjaHackingThreat)
     {
         _gameTicker.StartGameRule(ninjaHackingThreat.Rule, out _);
-        _chat.DispatchGlobalAnnouncement(Loc.GetString(ninjaHackingThreat.Announcement), playSound: true, colorOverride: Color.Red);
+        var message = Loc.GetString(ninjaHackingThreat.Announcement);
+        _chat.DispatchAnnouncement(message, colorOverride: Color.Red, playSound: false);
     }
 }
 
