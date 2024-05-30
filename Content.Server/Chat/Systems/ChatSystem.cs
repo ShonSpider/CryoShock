@@ -325,41 +325,40 @@ public sealed partial class ChatSystem : SharedChatSystem
         var wrappedMessage = Loc.GetString("chat-manager-sender-announcement-wrap-message", ("sender", sender),
         ("message", FormattedMessage.EscapeText(message)));
 
-        if (uid != default)
+        if (global is false)
         {
             var station = _stationSystem.GetOwningStation(uid);
 
-            if (station is not null && global is false)
+            if (station is not null)
             {
                 if (!EntityManager.TryGetComponent<StationDataComponent>(station, out var stationDataComp))
                     return;
 
-                _chatManager.ChatMessageToManyFiltered(_stationSystem.GetInStation(stationDataComp), ChatChannel.Radio, message, wrappedMessage, uid, false, true, colorOverride ?? Color.Gold);
+                var filter = _stationSystem.GetInStation(stationDataComp);
+                _chatManager.ChatMessageToManyFiltered(filter, ChatChannel.Radio, message, wrappedMessage, uid, false, true, colorOverride ?? Color.Gold);
                 _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Station announcement from {sender}: {message}");
 
-                if (playSound == true && sound == null)
-                    _audio.PlayGlobal(DefaultAnnouncementSound,
-                    _stationSystem.GetInStation(stationDataComp),
-                    true, AudioParams.Default.WithVolume(-2f));
-
-                if (playSound == true && sound != null)
-                    _audio.PlayGlobal(_audio.GetSound(sound),
-                    _stationSystem.GetInStation(stationDataComp),
-                    true, sound.Params.AddVolume(-2f));
+                if (playSound is true)
+                {
+                    if (sound is null)
+                        _audio.PlayGlobal(DefaultAnnouncementSound, filter, true, AudioParams.Default.WithVolume(-2f));
+                    else
+                        _audio.PlayGlobal(_audio.GetSound(sound), filter, true, sound.Params.AddVolume(-2f));
+                }
             }
         }
-        if (global is true)
+        else
         {
             _chatManager.ChatMessageToAll(ChatChannel.Radio, message, wrappedMessage, default, false, true, colorOverride ?? Color.Gold);
             _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Global announcement from {sender}: {message}");
 
-            if (playSound == true && sound == null)
-                _audio.PlayGlobal(DefaultAnnouncementSound,
-                Filter.Broadcast(), true, AudioParams.Default.WithVolume(-2f));
-
-            if (playSound == true && sound != null)
-                _audio.PlayGlobal(_audio.GetSound(sound),
-                Filter.Broadcast(), true, sound.Params.AddVolume(-2f));
+            if (playSound is true)
+            {
+                if (sound is null)
+                    _audio.PlayGlobal(DefaultAnnouncementSound, Filter.Broadcast(), true, AudioParams.Default.WithVolume(-2f));
+                else
+                    _audio.PlayGlobal(_audio.GetSound(sound), Filter.Broadcast(), true, sound.Params.AddVolume(-2f));
+            }
         }
     }
 
