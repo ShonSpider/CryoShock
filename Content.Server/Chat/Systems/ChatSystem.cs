@@ -15,7 +15,6 @@ using Content.Shared.Chat;
 using Content.Shared.Database;
 using Content.Shared.Ghost;
 using Content.Shared.IdentityManagement;
-using Content.Shared.Interaction;
 using Content.Shared.Mobs.Systems;
 using Content.Shared.Players;
 using Content.Shared.Radio;
@@ -31,6 +30,7 @@ using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
 using Robust.Shared.Replays;
 using Robust.Shared.Utility;
+using Content.Server.Examine;
 
 namespace Content.Server.Chat.Systems;
 
@@ -54,8 +54,8 @@ public sealed partial class ChatSystem : SharedChatSystem
     [Dependency] private readonly StationSystem _stationSystem = default!;
     [Dependency] private readonly MobStateSystem _mobStateSystem = default!;
     [Dependency] private readonly SharedAudioSystem _audio = default!;
-    [Dependency] private readonly SharedInteractionSystem _interactionSystem = default!;
     [Dependency] private readonly ReplacementAccentSystem _wordreplacement = default!;
+    [Dependency] private readonly ExamineSystem _examine = default!;
 
     // Corvax-TTS-Start: Moved from Server to Shared
     // public const int VoiceRange = 10; // how far voice goes in world units
@@ -378,39 +378,47 @@ public sealed partial class ChatSystem : SharedChatSystem
         if (!_actionBlocker.CanSpeak(source) && !ignoreActionBlocker)
             return;
 
-        var message = TransformSpeech(source, FormattedMessage.RemoveMarkup(originalMessage));
+        var message = TransformSpeech(source, FormattedMessage.RemoveMarkup(FormattedMessage.EscapeText(originalMessage)));
 
         if (message.Length == 0)
             return;
 
         var speech = GetSpeechVerb(source, message);
 
-        // get the entity's apparent name (if no override provided).
-        string name;
-        if (nameOverride != null)
-        {
-            name = nameOverride;
-        }
-        else
-        {
-            var nameEv = new TransformSpeakerNameEvent(source, Name(source));
-            RaiseLocalEvent(source, nameEv);
-            name = nameEv.Name;
-            // Check for a speech verb override
-            if (nameEv.SpeechVerb != null && _prototypeManager.TryIndex<SpeechVerbPrototype>(nameEv.SpeechVerb, out var proto))
-                speech = proto;
-        }
+        var nameEv = new TransformSpeakerNameEvent(source, Name(source));
+        RaiseLocalEvent(source, nameEv);
 
-        name = FormattedMessage.EscapeText(name);
+        if (nameEv.SpeechVerb != null && _prototypeManager.TryIndex<SpeechVerbPrototype>(nameEv.SpeechVerb, out var proto)) // Check for a speech verb override
+            speech = proto;
+
+        var name = FormattedMessage.EscapeText(Name(source));
+        var nameIdentity = FormattedMessage.EscapeText(nameOverride ?? Identity.Name(source, EntityManager));
+        var verb = Loc.GetString(_random.Pick(speech.SpeechVerbStrings));
+
+        if (nameEv.Name != Name(source))
+            nameIdentity = FormattedMessage.EscapeText(nameEv.Name);
 
         var wrappedMessage = Loc.GetString(speech.Bold ? "chat-manager-entity-say-bold-wrap-message" : "chat-manager-entity-say-wrap-message",
             ("entityName", name),
-            ("verb", Loc.GetString(_random.Pick(speech.SpeechVerbStrings))),
+            ("verb", verb),
             ("fontType", speech.FontId),
             ("fontSize", speech.FontSize),
-            ("message", FormattedMessage.EscapeText(message)));
+            ("message", message));
 
-        SendInVoiceRange(ChatChannel.Local, message, wrappedMessage, source, range);
+        var wrappedIdentityMessage = Loc.GetString(speech.Bold ? "chat-manager-entity-say-bold-wrap-identity-message" : "chat-manager-entity-say-wrap-identity-message",
+            ("nameIdentity", nameIdentity),
+            ("verb", verb),
+            ("fontType", speech.FontId),
+            ("fontSize", speech.FontSize),
+            ("message", message));
+
+        var wrappedUnknownMessage = Loc.GetString(speech.Bold ? "chat-manager-entity-say-bold-wrap-message-unknown" : "chat-manager-entity-say-wrap-message-unknown",
+            ("verb", verb),
+            ("fontType", speech.FontId),
+            ("fontSize", speech.FontSize),
+            ("message", message));
+
+        SendSpeak(message, wrappedMessage, wrappedIdentityMessage, wrappedUnknownMessage, VoiceRange, range, source);
 
         var ev = new EntitySpokeEvent(source, message, originalMessage, null, null);
         RaiseLocalEvent(source, ev, true);
@@ -452,74 +460,58 @@ public sealed partial class ChatSystem : SharedChatSystem
             return;
 
         var message = TransformSpeech(source, FormattedMessage.RemoveMarkup(originalMessage));
+
         if (message.Length == 0)
             return;
 
-        var obfuscatedMessage = ObfuscateMessageReadability(message, 0.2f);
+        var nameEv = new TransformSpeakerNameEvent(source, Name(source));
+        RaiseLocalEvent(source, nameEv);
 
+        var obfuscatedMessage = ObfuscateMessageReadability(message, 0.2f);
         // get the entity's name by visual identity (if no override provided).
-        string nameIdentity = FormattedMessage.EscapeText(nameOverride ?? Identity.Name(source, EntityManager));
-        // get the entity's name by voice (if no override provided).
-        string name;
-        if (nameOverride != null)
-        {
-            name = nameOverride;
-        }
-        else
-        {
-            var nameEv = new TransformSpeakerNameEvent(source, Name(source));
-            RaiseLocalEvent(source, nameEv);
-            name = nameEv.Name;
-        }
-        name = FormattedMessage.EscapeText(name);
+        var nameIdentity = FormattedMessage.EscapeText(nameOverride ?? Identity.Name(source, EntityManager));
+        var name = Name(source);
+
+        if (nameEv.Name != Name(source))
+            nameIdentity = FormattedMessage.EscapeText(nameEv.Name);
 
         var wrappedMessage = Loc.GetString("chat-manager-entity-whisper-wrap-message",
             ("entityName", name), ("message", FormattedMessage.EscapeText(message)));
 
-        var wrappedobfuscatedMessage = Loc.GetString("chat-manager-entity-whisper-wrap-message",
-            ("entityName", nameIdentity), ("message", FormattedMessage.EscapeText(obfuscatedMessage)));
+        var wrappedIdentityMessage = Loc.GetString("chat-manager-entity-whisper-identity-wrap-message",
+            ("entityName", nameIdentity), ("message", FormattedMessage.EscapeText(message)));
 
         var wrappedUnknownMessage = Loc.GetString("chat-manager-entity-whisper-unknown-wrap-message",
+            ("message", FormattedMessage.EscapeText(message)));
+
+        var wrappedObfuscatedMessage = Loc.GetString("chat-manager-entity-whisper-obfuscated-wrap-message",
+            ("entityName", nameIdentity), ("message", FormattedMessage.EscapeText(obfuscatedMessage)));
+
+        var wrappedObfuscatedUnknownMessage = Loc.GetString("chat-manager-entity-whisper-unknown-obfuscated-wrap-message",
             ("message", FormattedMessage.EscapeText(obfuscatedMessage)));
 
-
-        foreach (var (session, data) in GetRecipients(source, WhisperMuffledRange))
-        {
-            EntityUid listener;
-
-            if (session.AttachedEntity is not { Valid: true } playerEntity)
-                continue;
-            listener = session.AttachedEntity.Value;
-
-            if (MessageRangeCheck(session, data, range) != MessageRangeCheckResult.Full)
-                continue; // Won't get logged to chat, and ghosts are too far away to see the pop-up, so we just won't send it to them.
-
-            if (data.Range <= WhisperClearRange)
-                _chatManager.ChatMessageToOne(ChatChannel.Whisper, message, wrappedMessage, source, false, session.Channel);
-            //If listener is too far, they only hear fragments of the message
-            //Collisiongroup.Opaque is not ideal for this use. Preferably, there should be a check specifically with "Can Ent1 see Ent2" in mind
-            else if (_interactionSystem.InRangeUnobstructed(source, listener, WhisperMuffledRange, Shared.Physics.CollisionGroup.Opaque)) //Shared.Physics.CollisionGroup.Opaque
-                _chatManager.ChatMessageToOne(ChatChannel.Whisper, obfuscatedMessage, wrappedobfuscatedMessage, source, false, session.Channel);
-            //If listener is too far and has no line of sight, they can't identify the whisperer's identity
-            else
-                _chatManager.ChatMessageToOne(ChatChannel.Whisper, obfuscatedMessage, wrappedUnknownMessage, source, false, session.Channel);
-        }
+        SendWhisper(message, wrappedMessage, wrappedIdentityMessage, wrappedUnknownMessage,
+        wrappedObfuscatedMessage, wrappedObfuscatedUnknownMessage,
+        WhisperClearRange, WhisperMuffledRange, range, source);
 
         _replay.RecordServerMessage(new ChatMessage(ChatChannel.Whisper, message, wrappedMessage, GetNetEntity(source), null, MessageRangeHideChatForReplay(range)));
 
         var ev = new EntitySpokeEvent(source, message, originalMessage, channel, obfuscatedMessage);
         RaiseLocalEvent(source, ev, true);
+
         if (!hideLog)
             if (originalMessage == message)
             {
-                if (name != Name(source))
-                    _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Whisper from {ToPrettyString(source):user} as {name}: {originalMessage}.");
+                if (name is not null)
+                    _adminLogger.Add(LogType.Chat, LogImpact.Low,
+                    $"Whisper from {ToPrettyString(source):user} as {name}: {originalMessage}.");
                 else
-                    _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Whisper from {ToPrettyString(source):user}: {originalMessage}.");
+                    _adminLogger.Add(LogType.Chat, LogImpact.Low,
+                    $"Whisper from {ToPrettyString(source):user}: {originalMessage}.");
             }
             else
             {
-                if (name != Name(source))
+                if (name is not null)
                     _adminLogger.Add(LogType.Chat, LogImpact.Low,
                     $"Whisper from {ToPrettyString(source):user} as {name}, original: {originalMessage}, transformed: {message}.");
                 else
@@ -535,26 +527,37 @@ public sealed partial class ChatSystem : SharedChatSystem
         string? nameOverride,
         bool hideLog = false,
         bool checkEmote = true,
-        bool ignoreActionBlocker = false,
-        NetUserId? author = null
+        bool ignoreActionBlocker = false
         )
     {
         if (!_actionBlocker.CanEmote(source) && !ignoreActionBlocker)
             return;
 
+        var nameEv = new TransformSpeakerNameEvent(source, Name(source));
+        RaiseLocalEvent(source, nameEv);
+
         // get the entity's apparent name (if no override provided).
-        var ent = Identity.Entity(source, EntityManager);
-        string name = FormattedMessage.EscapeText(nameOverride ?? Name(ent));
+        var nameIdentity = FormattedMessage.EscapeText(nameOverride ?? Identity.Name(source, EntityManager));
+        var name = FormattedMessage.EscapeText(Name(source));
+
+        if (nameEv.Name != Name(source))
+            nameIdentity = FormattedMessage.EscapeText(nameEv.Name);
 
         // Emotes use Identity.Name, since it doesn't actually involve your voice at all.
         var wrappedMessage = Loc.GetString("chat-manager-entity-me-wrap-message",
             ("entityName", name),
-            ("entity", ent),
+            ("entity", nameIdentity),
+            ("message", FormattedMessage.RemoveMarkup(action)));
+
+        var wrappedIdentityMessage = Loc.GetString("chat-manager-entity-me-wrap-identity-message",
+            ("entityName", nameIdentity),
             ("message", FormattedMessage.RemoveMarkup(action)));
 
         if (checkEmote)
             TryEmoteChatInput(source, action);
-        SendInVoiceRange(ChatChannel.Emotes, action, wrappedMessage, source, range, author);
+
+        SendEmote(action, wrappedMessage, wrappedIdentityMessage, VoiceRange, range, source);
+
         if (!hideLog)
             if (name != Name(source))
                 _adminLogger.Add(LogType.Chat, LogImpact.Low, $"Emote from {ToPrettyString(source):user} as {name}: {action}");
@@ -662,18 +665,121 @@ public sealed partial class ChatSystem : SharedChatSystem
     /// <summary>
     ///     Sends a chat message to the given players in range of the source entity.
     /// </summary>
-    private void SendInVoiceRange(ChatChannel channel, string message, string wrappedMessage, EntityUid source, ChatTransmitRange range, NetUserId? author = null)
+    private void SendInVoiceRange(ChatChannel channel, string message, string wrappedMessage, EntityUid source, ChatTransmitRange range, NetUserId? author = null, bool hideChat = false)
     {
         foreach (var (session, data) in GetRecipients(source, VoiceRange))
         {
-            var entRange = MessageRangeCheck(session, data, range);
-            if (entRange == MessageRangeCheckResult.Disallowed)
+            if (MessageRangeCheck(session, data, range) == MessageRangeCheckResult.Disallowed)
                 continue;
-            var entHideChat = entRange == MessageRangeCheckResult.HideChat;
-            _chatManager.ChatMessageToOne(channel, message, wrappedMessage, source, entHideChat, session.Channel, author: author);
+
+            _chatManager.ChatMessageToOne(channel, message, wrappedMessage, source, hideChat, session.Channel, author: author);
         }
 
         _replay.RecordServerMessage(new ChatMessage(channel, message, wrappedMessage, GetNetEntity(source), null, MessageRangeHideChatForReplay(range)));
+    }
+
+    /// <summary>
+    ///     Отправляет сообщение в чат голоса указанным игрокам, находящимся в зоне действия исходного объекта. (Зона 10 клеток.)
+    /// </summary>
+    private void SendSpeak(
+    string message,
+    string wrapMsg,
+    string wrapIdenMsg,
+    string wrapUnknowMsg,
+    int chatRange,
+    ChatTransmitRange range,
+    EntityUid source,
+    bool hideChat = false
+    )
+    {
+        foreach (var (session, data) in GetRecipients(source, chatRange))
+        {
+            if (session.AttachedEntity is null)
+                continue;
+
+            if (MessageRangeCheck(session, data, range) != MessageRangeCheckResult.Full)
+                continue;
+
+            if (session.AttachedEntity.Value == source)
+                _chatManager.ChatMessageToOne(ChatChannel.Local, message, wrapMsg, source, hideChat, session.Channel);
+
+            else if (data.Range <= chatRange && _examine.CanExamine(source, session.AttachedEntity.Value))
+                _chatManager.ChatMessageToOne(ChatChannel.Local, message, wrapIdenMsg, source, hideChat, session.Channel);
+
+            else
+                _chatManager.ChatMessageToOne(ChatChannel.Local, message, wrapUnknowMsg, source, hideChat, session.Channel);
+        }
+    }
+
+    /// <summary>
+    ///     Отправляет сообщение в чат шёпота указанным игрокам, находящимся в зоне действия исходного объекта. (Зона 5 клеток.)
+    /// </summary>
+    private void SendWhisper(
+    string message,
+    string wrapMsg,
+    string wrapIdenMsg,
+    string wrapUnknowMsg,
+    string wrapObfusMsg,
+    string wrapObfusUnknowMsg,
+    int chatRange,
+    int chatObfusRange,
+    ChatTransmitRange range,
+    EntityUid source,
+    bool hideChat = false
+    )
+    {
+        foreach (var (session, data) in GetRecipients(source, chatObfusRange))
+        {
+            if (session.AttachedEntity is null)
+                continue;
+
+            if (MessageRangeCheck(session, data, range) != MessageRangeCheckResult.Full)
+                continue;
+
+            if (session.AttachedEntity.Value == source)
+                _chatManager.ChatMessageToOne(ChatChannel.Whisper, message, wrapMsg, source, hideChat, session.Channel);
+
+            else if (data.Range <= chatRange && _examine.CanExamine(source, session.AttachedEntity.Value))
+                _chatManager.ChatMessageToOne(ChatChannel.Whisper, message, wrapIdenMsg, source, hideChat, session.Channel);
+
+            else if (data.Range <= chatRange) // Если объект не в зоне видимости, но всё ещё в радиусе, для того, чтобы услышать чистый шёпот.
+                _chatManager.ChatMessageToOne(ChatChannel.Whisper, message, wrapUnknowMsg, source, hideChat, session.Channel);
+
+            else if (data.Range <= chatObfusRange && _examine.CanExamine(source, session.AttachedEntity.Value))
+                _chatManager.ChatMessageToOne(ChatChannel.Whisper, message, wrapObfusMsg, source, hideChat, session.Channel);
+
+            else
+                _chatManager.ChatMessageToOne(ChatChannel.Whisper, message, wrapObfusUnknowMsg, source, hideChat, session.Channel);
+        }
+    }
+
+    /// <summary>
+    ///     Отправляет сообщение в чат эмоций указанным игрокам, находящимся в зоне действия исходного объекта. (Зона 10 клеток.)
+    /// </summary>
+    private void SendEmote(
+    string message,
+    string wrapMsg,
+    string wrapIdenMsg,
+    int chatRange,
+    ChatTransmitRange range,
+    EntityUid source,
+    bool hideChat = false
+    )
+    {
+        foreach (var (session, data) in GetRecipients(source, chatRange))
+        {
+            if (session.AttachedEntity is null)
+                continue;
+
+            if (MessageRangeCheck(session, data, range) != MessageRangeCheckResult.Full)
+                continue;
+
+            if (session.AttachedEntity.Value == source)
+                _chatManager.ChatMessageToOne(ChatChannel.Emotes, message, wrapMsg, source, hideChat, session.Channel);
+
+            else if (data.Range <= chatRange && _examine.CanExamine(source, session.AttachedEntity.Value))
+                _chatManager.ChatMessageToOne(ChatChannel.Emotes, message, wrapIdenMsg, source, hideChat, session.Channel);
+        }
     }
 
     /// <summary>
@@ -832,7 +938,7 @@ public sealed partial class ChatSystem : SharedChatSystem
 
         for (var i = 0; i < message.Length; i++)
         {
-            if (char.IsWhiteSpace((modifiedMessage[i])))
+            if (char.IsWhiteSpace(modifiedMessage[i]))
             {
                 continue;
             }

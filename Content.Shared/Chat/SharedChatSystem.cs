@@ -77,7 +77,7 @@ public abstract class SharedChatSystem : EntitySystem
         SpeechVerbPrototype? current = null;
         foreach (var (str, id) in speech.SuffixSpeechVerbs)
         {
-            var proto = _prototypeManager.Index<SpeechVerbPrototype>(id);
+            var proto = _prototypeManager.Index(id);
             if (message.EndsWith(Loc.GetString(str)) && proto.Priority >= (current?.Priority ?? 0))
             {
                 current = proto;
@@ -85,7 +85,7 @@ public abstract class SharedChatSystem : EntitySystem
         }
 
         // if no applicable suffix verb return the normal one used by the entity
-        return current ?? _prototypeManager.Index<SpeechVerbPrototype>(speech.SpeechVerb);
+        return current ?? _prototypeManager.Index(speech.SpeechVerb);
     }
 
     /// <summary>

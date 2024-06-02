@@ -33,7 +33,7 @@ public sealed partial class IdCardComponent : Component
     /// </summary>
     [DataField("jobDepartments")]
     [AutoNetworkedField]
-    public List<LocId> JobDepartments = new();
+    public List<LocId> JobDepartments = [];
 
     /// <summary>
     /// Determines if accesses from this card should be logged by <see cref="AccessReaderComponent"/>

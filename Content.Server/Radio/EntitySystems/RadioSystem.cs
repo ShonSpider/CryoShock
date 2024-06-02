@@ -3,11 +3,13 @@ using Content.Server.Chat.Systems;
 using Content.Server.Power.Components;
 using Content.Server.Radio.Components;
 using Content.Server.VoiceMask;
+using Content.Shared.PDA;
 using Content.Shared.Chat;
 using Content.Shared.Database;
 using Content.Shared.Radio;
 using Content.Shared.Radio.Components;
 using Content.Shared.Speech;
+using Content.Shared.Inventory;
 using Robust.Shared.Map;
 using Robust.Shared.Network;
 using Robust.Shared.Player;
@@ -15,6 +17,7 @@ using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
 using Robust.Shared.Replays;
 using Robust.Shared.Utility;
+using Content.Shared.Access.Components;
 
 namespace Content.Server.Radio.EntitySystems;
 
@@ -29,6 +32,7 @@ public sealed class RadioSystem : EntitySystem
     [Dependency] private readonly IPrototypeManager _prototype = default!;
     [Dependency] private readonly IRobustRandom _random = default!;
     [Dependency] private readonly ChatSystem _chat = default!;
+    [Dependency] private readonly InventorySystem _inventory = default!;
 
     // set used to prevent radio feedback loops.
     private readonly HashSet<string> _messages = new();
@@ -60,7 +64,7 @@ public sealed class RadioSystem : EntitySystem
     /// </summary>
     public void SendRadioMessage(EntityUid messageSource, string message, ProtoId<RadioChannelPrototype> channel, EntityUid radioSource, bool escapeMarkup = true)
     {
-        SendRadioMessage(messageSource, message, _prototype.Index(channel), radioSource, escapeMarkup: escapeMarkup);
+        SendRadioMessage(messageSource, message, _prototype.Index(channel), radioSource, escapeMarkup);
     }
 
     /// <summary>
@@ -74,17 +78,36 @@ public sealed class RadioSystem : EntitySystem
         if (!_messages.Add(message))
             return;
 
+        _inventory.TryGetSlotEntity(messageSource, "id", out var ent);
+
+        var idName = TryComp<PdaComponent>(ent, out var idPdaComp) && idPdaComp.ContainedId is not null
+            ? TryComp<IdCardComponent>(idPdaComp.ContainedId, out var idPda) && idPda.FullName is not null && idPda.FullName != string.Empty
+                ? idPda.FullName
+                : "Кто-то"
+            : TryComp<IdCardComponent>(ent, out var id) && id.FullName is not null && id.FullName != string.Empty
+                ? id.FullName
+                : "Кто-то";
+
+        var jobTitle = TryComp<PdaComponent>(ent, out var jobPdaComp) && jobPdaComp.ContainedId is not null
+            ? TryComp<IdCardComponent>(jobPdaComp.ContainedId, out var jobPda) && jobPda.JobTitle is not null && jobPda.JobTitle != string.Empty
+                ? jobPda.JobTitle
+                : "~"
+            : TryComp<IdCardComponent>(ent, out var job) && job.JobTitle is not null && job.JobTitle != string.Empty
+                ? job.JobTitle
+                : "~";
+
         var name = TryComp(messageSource, out VoiceMaskComponent? mask) && mask.Enabled
             ? mask.VoiceName
-            : MetaData(messageSource).EntityName;
+            : idName;
 
         name = FormattedMessage.EscapeText(name);
+        jobTitle = FormattedMessage.EscapeText(jobTitle);
 
         SpeechVerbPrototype speech;
         if (mask != null
             && mask.Enabled
             && mask.SpeechVerb != null
-            && _prototype.TryIndex<SpeechVerbPrototype>(mask.SpeechVerb, out var proto))
+            && _prototype.TryIndex(mask.SpeechVerb, out var proto))
         {
             speech = proto;
         }
@@ -102,6 +125,7 @@ public sealed class RadioSystem : EntitySystem
             ("verb", Loc.GetString(_random.Pick(speech.SpeechVerbStrings))),
             ("channel", $"\\[{channel.LocalizedName}\\]"),
             ("name", name),
+            ("jobTitle", jobTitle),
             ("message", content));
 
         // most radios are relayed to chat, so lets parse the chat message beforehand
@@ -129,8 +153,7 @@ public sealed class RadioSystem : EntitySystem
         {
             if (!radio.ReceiveAllChannels)
             {
-                if (!radio.Channels.Contains(channel.ID) || (TryComp<IntercomComponent>(receiver, out var intercom) &&
-                                                             !intercom.SupportedChannels.Contains(channel.ID)))
+                if (!radio.Channels.Contains(channel.ID) || TryComp<IntercomComponent>(receiver, out var intercom) && !intercom.SupportedChannels.Contains(channel.ID))
                     continue;
             }
 

@@ -8,7 +8,7 @@ namespace Content.Shared.IdentityManagement;
 public abstract class SharedIdentitySystem : EntitySystem
 {
     [Dependency] private readonly SharedContainerSystem _container = default!;
-    private static string SlotName = "identity";
+    private static readonly string SlotName = "identity";
 
     public override void Initialize()
     {
@@ -16,7 +16,7 @@ public abstract class SharedIdentitySystem : EntitySystem
 
         SubscribeLocalEvent<IdentityComponent, ComponentInit>(OnComponentInit);
         SubscribeLocalEvent<IdentityBlockerComponent, SeeIdentityAttemptEvent>(OnSeeIdentity);
-        SubscribeLocalEvent<IdentityBlockerComponent, InventoryRelayedEvent<SeeIdentityAttemptEvent>>((e, c, ev) => OnSeeIdentity(e, c, ev.Args));
+        SubscribeLocalEvent<IdentityBlockerComponent, InventoryRelayedEvent<SeeIdentityAttemptEvent>>((uid, bloker, ev) => OnSeeIdentity(uid, bloker, ev.Args));
         SubscribeLocalEvent<IdentityBlockerComponent, ItemMaskToggledEvent>(OnMaskToggled);
     }
 
@@ -25,7 +25,7 @@ public abstract class SharedIdentitySystem : EntitySystem
         if (component.Enabled)
         {
             args.TotalCoverage |= component.Coverage;
-            if(args.TotalCoverage == IdentityBlockerCoverage.FULL)
+            if (args.TotalCoverage == IdentityBlockerCoverage.FULL)
                 args.Cancel();
         }
     }
